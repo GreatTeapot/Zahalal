@@ -1,0 +1,33 @@
+services:
+  # region --------------- APPS --------------
+  user.api.tour:
+    environment:
+      SECRET_KEY : ${SECRET_KEY}
+      DEBUG : ${DEBUG}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS}
+      PG_HOST: ${PG_HOST}
+      PG_PORT: ${PG_PORT}
+      PG_USER: ${PG_USER}
+      PG_PASSWORD: ${PG_PASSWORD}
+      PG_DATABASE: ${PG_DATABASE_USER}
+
+    env_file:
+      - .env
+
+
+  # region --------------- DB ----------------
+  postgres.db.tour:
+    environment:
+      - POSTGRES_PASSWORD=${PG_PASSWORD}
+    ports:
+      - "5400:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    env_file:
+      - .env
+  # end ---------------------------------------
+
+volumes:
+  postgres_data:
+    driver: local
+ 

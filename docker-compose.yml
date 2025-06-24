@@ -1,0 +1,150 @@
+networks:
+  dev:
+
+services:
+  # BACKEND SERVICE
+  user.api.tour:
+     container_name: user.api.tour
+     build:
+       context: .
+       dockerfile: Dockerfile
+     depends_on:
+       - postgres.db.tour
+      #  - redis
+      #  - rabbitmq
+     restart: unless-stopped
+     networks:
+       - dev
+     volumes:
+       - static_volume:/usr/src/app/static/
+       - media_volume:/usr/src/app/media/
+
+  # DATABASE SERVICE
+  postgres.db.tour:
+    image: postgres:17.2-alpine
+    container_name: postgres.db.tour
+    restart: unless-stopped
+    networks:
+      - dev
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 10s
+      retries: 5
+      start_period: 30s
+      timeout: 10s
+
+
+  # NGINX SERVICE 
+  redis:
+     image: redis:latest
+     container_name: redis-store
+     volumes:
+       - redis_data:/data/
+     env_file:
+       - .env
+     networks:
+       - dev
+
+
+  # rabbitmq:
+  #   image: rabbitmq:3.13-management
+  #   container_name: rabbitmq-store
+  #   hostname: rabbitmq
+  #   ports:
+  #     - "15672:15672"
+  #     - "5672:5672"
+  #   volumes:
+  #     - rabbitmq_data:/var/lib/rabbitmq/
+  #     - ./rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
+  #   networks:
+  #     - dev
+
+  # celery:
+  #   build:
+  #     context: .
+  #   command: ['celery', '--app=config', 'worker', '--loglevel=info', '--pool=solo']
+  #   volumes:
+  #     - ./:/usr/src/app/
+  #   container_name: celery-store
+  #   env_file:
+  #     - .env
+  #   environment:
+  #     - BROKER_URL=${RABBIT_URL}
+  #     - RESULT_BACKEND=${REDIS_URL}
+  #     - BROKER_CONNECTION_RETRY=300
+  #   depends_on:
+  #     - postgres.db.tour
+  #     - redis
+  #     - rabbitmq
+  #     - user.api.tour
+  #   networks:
+  #     - dev
+ 
+  # celery-beat:
+  #   build:
+  #     context: .
+  #   command: ['celery', '-A', 'config', 'beat', '-l', 'info']
+  #   volumes:
+  #     - ./:/usr/src/app/
+  #   container_name: celery-beat-store
+  #   depends_on:
+  #     - user.api.tour
+  #     - postgres.db.tour
+  #     - rabbitmq
+  #     - celery
+  #     - redis
+  
+ 
+
+  nginx:
+    image: nginx:latest
+    container_name: nginx
+    restart: always
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - static_volume:/usr/src/app/static/
+      - media_volume:/usr/src/app/media/
+      - /etc/letsencrypt:/etc/letsencrypt
+      - /var/www/certbot:/var/www/certbot
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - user.api.tour
+      - frontend
+    networks:
+      - dev
+
+  # FRONTEND SERVICE
+  frontend: 
+    container_name: frontend
+    build:
+      context: frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    networks:
+      - dev
+    ports:
+      - "3000:3000"
+    depends_on:
+      - user.api.tour
+
+  certbot:
+    image: certbot/certbot 
+    container_name: certbot
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt
+      - /var/www/certbot:/var/www/certbot
+    entrypoint: sh -c "certbot certonly --webroot -w /var/www/certbot --email kunjutdone@gmail.com --agree-tos --no-eff-email --force-renewal --non-interactive --quiet -d awesomekyrgyztravel.com -d www.awesomekyrgyztravel.com && nginx -s reload && sleep 89d"
+    networks:
+      - dev
+
+volumes:
+  static_volume:
+    name: tour_static_volume
+  media_volume:
+    name: tour_media_volume
+  postgres_data:
+  redis_data:
+  # rabbitmq_data:
+  
